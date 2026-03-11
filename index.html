@@ -264,6 +264,27 @@
     color: #e94560;
   }
 
+  .voters-list {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    padding: 0 1.5rem 0.6rem;
+    background: #1e1e1e;
+    border-bottom: 1px solid #2a2a2a;
+  }
+
+  .voter-badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    background: #2a2a4a;
+    color: #8888cc;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+
   /* Gallery */
   .gallery-container {
     position: relative;
@@ -686,6 +707,16 @@ const MAX_VOTES = 2;
 const votes = {};
 products.forEach(p => votes[p.id] = 0);
 
+// Who voted for what: { productId: ["AG", "KA", ...] }
+const votersByProduct = {};
+products.forEach(p => votersByProduct[p.id] = []);
+
+function nameToInitials(name) {
+  // Name is stored uppercase, return 2-letter initials
+  if (!name) return '??';
+  return name.charAt(0) + name.charAt(1).toLowerCase();
+}
+
 // Active code session
 let activeCode = null;   // the validated code string
 let codeData = null;     // {used: N, votes: [...]}
@@ -859,6 +890,9 @@ function renderProducts() {
         ${retractHtml}
         <div class="vote-count" id="vote-count-${p.id}"><span>${voteCount}</span> ${voteCount === 1 ? 'glos' : 'glosow'}</div>
       </div>
+      <div class="voters-list" id="voters-${p.id}">
+        ${(votersByProduct[p.id] || []).map(name => `<span class="voter-badge">${name}</span>`).join('')}
+      </div>
       <div class="gallery-container">
         <div class="gallery-main" onclick="openLightbox(${pi})">
           <button class="gallery-nav prev" onclick="event.stopPropagation();navGallery(${pi},-1)">&#8249;</button>
@@ -1019,6 +1053,29 @@ function initFirebaseListeners() {
       votes[p.id] = data[p.id] || 0;
     });
     updateVoteUI();
+  });
+
+  // Listen to codes to show who voted
+  db.ref('codes').on('value', snapshot => {
+    const allCodes = snapshot.val() || {};
+    // Reset
+    products.forEach(p => votersByProduct[p.id] = []);
+    // Build voter lists
+    Object.entries(allCodes).forEach(([name, data]) => {
+      const v = data.votes || [];
+      v.forEach(productId => {
+        if (votersByProduct[productId]) {
+          votersByProduct[productId].push(nameToInitials(name));
+        }
+      });
+    });
+    // Update UI
+    products.forEach(p => {
+      const el = document.getElementById(`voters-${p.id}`);
+      if (el) {
+        el.innerHTML = votersByProduct[p.id].map(n => `<span class="voter-badge">${n}</span>`).join('');
+      }
+    });
   });
 
   tryRestoreCode();
