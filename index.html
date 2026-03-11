@@ -707,14 +707,19 @@ const MAX_VOTES = 2;
 const votes = {};
 products.forEach(p => votes[p.id] = 0);
 
-// Who voted for what: { productId: ["AG", "KA", ...] }
+// Who voted for what: { productId: [{initials:"Ba", full:"Bartek"}, ...] }
 const votersByProduct = {};
 products.forEach(p => votersByProduct[p.id] = []);
 
 function nameToInitials(name) {
-  // Name is stored uppercase, return 2-letter initials
   if (!name) return '??';
   return name.charAt(0) + name.charAt(1).toLowerCase();
+}
+
+function nameToDisplay(name) {
+  if (!name) return '??';
+  // Capitalize first letter, lowercase rest
+  return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
 }
 
 // Active code session
@@ -941,18 +946,22 @@ function updateRanking(totalVotes) {
     return;
   }
   section.style.display = '';
-  const sorted = products.map(p => ({name: p.name, votes: votes[p.id] || 0}))
-    .sort((a, b) => b.votes - a.votes);
+  const sorted = products.map(p => ({
+    name: p.name,
+    id: p.id,
+    votes: votes[p.id] || 0
+  })).sort((a, b) => b.votes - a.votes);
   const maxVotes = sorted[0].votes || 1;
 
   barsEl.innerHTML = sorted.map(item => {
     const pct = Math.round((item.votes / maxVotes) * 100);
+    const voters = (votersByProduct[item.id] || []).map(v => v.initials).join(', ');
     return `
     <div class="ranking-row">
       <div class="ranking-label">${item.name}</div>
       <div class="ranking-bar-bg">
         <div class="ranking-bar-fill" style="width:${pct}%"></div>
-        <div class="ranking-votes">${item.votes}</div>
+        <div class="ranking-votes">${item.votes}${voters ? ' · ' + voters : ''}</div>
       </div>
     </div>`;
   }).join('');
@@ -1069,17 +1078,22 @@ function initFirebaseListeners() {
       const v = data.votes || [];
       v.forEach(productId => {
         if (votersByProduct[productId]) {
-          votersByProduct[productId].push(nameToInitials(name));
+          votersByProduct[productId].push({
+            initials: nameToInitials(name),
+            full: nameToDisplay(name)
+          });
         }
       });
     });
-    // Update UI
+    // Update product voter badges (full names)
     products.forEach(p => {
       const el = document.getElementById(`voters-${p.id}`);
       if (el) {
-        el.innerHTML = votersByProduct[p.id].map(n => `<span class="voter-badge">${n}</span>`).join('');
+        el.innerHTML = votersByProduct[p.id].map(v => `<span class="voter-badge">${v.full}</span>`).join('');
       }
     });
+    // Update ranking with initials
+    updateRanking(Object.values(votes).reduce((s,v) => s+v, 0));
   });
 
   tryRestoreCode();
