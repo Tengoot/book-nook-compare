@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Book Nook - Porownanie produktow</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #0f0f0f;
+    color: #e0e0e0;
+    line-height: 1.5;
+  }
+
+  header {
+    text-align: center;
+    padding: 2rem 1rem;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    border-bottom: 2px solid #e94560;
+  }
+
+  header h1 {
+    font-size: 2rem;
+    color: #fff;
+    margin-bottom: 0.5rem;
+  }
+
+  header p {
+    color: #aaa;
+    font-size: 0.95rem;
+  }
+
+  .products {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 3rem;
+  }
+
+  .product-card {
+    background: #1a1a1a;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid #333;
+    transition: border-color 0.2s;
+  }
+
+  .product-card:hover {
+    border-color: #e94560;
+  }
+
+  .product-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.25rem 1.5rem;
+    background: #222;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .product-header h2 {
+    font-size: 1.25rem;
+    color: #fff;
+  }
+
+  .product-meta {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .price {
+    background: #e94560;
+    color: #fff;
+    padding: 0.3rem 0.75rem;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 1rem;
+    white-space: nowrap;
+  }
+
+  .source {
+    color: #aaa;
+    font-size: 0.85rem;
+  }
+
+  .source a {
+    color: #5dade2;
+    text-decoration: none;
+  }
+
+  .source a:hover {
+    text-decoration: underline;
+  }
+
+  .product-info {
+    padding: 0.75rem 1.5rem;
+    color: #bbb;
+    font-size: 0.9rem;
+    border-bottom: 1px solid #2a2a2a;
+  }
+
+  /* Gallery */
+  .gallery-container {
+    position: relative;
+    padding: 1rem;
+  }
+
+  .gallery-main {
+    position: relative;
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto 1rem;
+    aspect-ratio: 1;
+    background: #111;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+  }
+
+  .gallery-main img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+  }
+
+  .gallery-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0,0,0,0.7);
+    color: #fff;
+    border: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    font-size: 1.2rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    z-index: 2;
+  }
+
+  .gallery-nav:hover { background: rgba(233,69,96,0.8); }
+  .gallery-nav.prev { left: 8px; }
+  .gallery-nav.next { right: 8px; }
+
+  .gallery-counter {
+    position: absolute;
+    bottom: 8px;
+    right: 12px;
+    background: rgba(0,0,0,0.7);
+    color: #fff;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    z-index: 2;
+  }
+
+  .gallery-thumbs {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 4px 0;
+    scrollbar-width: thin;
+    scrollbar-color: #444 #1a1a1a;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .gallery-thumbs::-webkit-scrollbar { height: 6px; }
+  .gallery-thumbs::-webkit-scrollbar-track { background: #1a1a1a; }
+  .gallery-thumbs::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
+
+  .thumb {
+    width: 64px;
+    height: 64px;
+    border-radius: 6px;
+    overflow: hidden;
+    cursor: pointer;
+    border: 2px solid transparent;
+    flex-shrink: 0;
+    transition: border-color 0.15s;
+  }
+
+  .thumb.active { border-color: #e94560; }
+  .thumb:hover { border-color: #5dade2; }
+
+  .thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  /* Lightbox */
+  .lightbox {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.95);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .lightbox.open { display: flex; }
+
+  .lightbox img {
+    max-width: 90vw;
+    max-height: 90vh;
+    object-fit: contain;
+    border-radius: 8px;
+  }
+
+  .lightbox-close {
+    position: absolute;
+    top: 1rem;
+    right: 1.5rem;
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 2rem;
+    cursor: pointer;
+  }
+
+  .lightbox-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+    border: none;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .lightbox-nav:hover { background: rgba(233,69,96,0.6); }
+  .lightbox-nav.prev { left: 1rem; }
+  .lightbox-nav.next { right: 1rem; }
+
+  .lightbox-counter {
+    position: absolute;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #aaa;
+    font-size: 0.9rem;
+  }
+
+  @media (max-width: 768px) {
+    header h1 { font-size: 1.4rem; }
+    .product-header h2 { font-size: 1.05rem; }
+    .gallery-main { max-width: 100%; }
+    .thumb { width: 48px; height: 48px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Book Nook DIY - Porownanie produktow</h1>
+  <p>7 modeli miniaturowych domkow do samodzielnego zlozenia</p>
+</header>
+
+<div class="products" id="products"></div>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox">
+  <button class="lightbox-close" onclick="closeLightbox()">&times;</button>
+  <button class="lightbox-nav prev" onclick="lightboxNav(-1)">&#8249;</button>
+  <img id="lightbox-img" src="" alt="">
+  <button class="lightbox-nav next" onclick="lightboxNav(1)">&#8250;</button>
+  <div class="lightbox-counter" id="lightbox-counter"></div>
+</div>
+
+<script>
+const products = [
+  {
+    name: "Dom Slytherin - Harry Potter DIY 3D",
+    price: "199,00 zl",
+    oldPrice: "299,99 zl",
+    source: "Home&Fun",
+    url: "https://homeandfun.com.pl/pl/products/diy-book-nook-dom-slytherin-harry-potter-diy-3d-268.html",
+    info: "Zestaw do samodzielnego zlozenia. Oswietlenie LED z wlacznikiem dotykowym. Wymiary ok. 20x14x10cm. Poziom trudnosci: sredni (14+). Instrukcja w jezyku polskim.",
+    folder: "slytherin",
+    images: Array.from({length:10}, (_,i) => `images/slytherin/img_${i}.png`)
+  },
+  {
+    name: "Fantastyczne Zwierzeta - Cutebee",
+    price: "199,00 zl",
+    source: "Home&Fun",
+    url: "https://homeandfun.com.pl/pl/products/diy-book-nook-fantastyczne-zwierzeta-cutebee-262.html",
+    info: "Mechanizm obrotowy, oslona przeciwkurzowa, ilustrowana instrukcja krok po kroku.",
+    folder: "fantastic-beasts",
+    images: Array.from({length:10}, (_,i) => `images/fantastic-beasts/img_${i}.png`)
+  },
+  {
+    name: "Agencja Detektywistyczna - Cutebee",
+    price: "199,00 zl",
+    source: "Home&Fun",
+    url: "https://homeandfun.com.pl/pl/products/agencja-detektywistyczna-cutebee-diy-book-nook-puzzle-3d-prezent-198.html",
+    info: "Cofnij sie w czasie, zostan detektywem, zlam kod, przeprowadz rekonstrukcje wydarzen i rozwiaz zagadke!",
+    folder: "detective",
+    images: Array.from({length:10}, (_,i) => `images/detective/img_${i}.png`)
+  },
+  {
+    name: "Swiat Przyszlosci - Joincon (HABARRI)",
+    price: "~139,00 zl",
+    source: "Empik",
+    url: "https://www.empik.com/miniaturowy-domek-book-nook-swiat-przyszlosci-joincon-habarri,p1629128928,szkolne-i-papiernicze-p",
+    info: "Zestaw kreatywny DIY. Motyw: swiat przyszlosci / sci-fi. Wiek: 8+.",
+    folder: "future-world",
+    images: Array.from({length:10}, (_,i) => `images/future-world/img_${i}.jpg`)
+  },
+  {
+    name: "Swiat Basniowych Snow - HABARRI",
+    price: "~139,00 zl",
+    source: "Empik",
+    url: "https://www.empik.com/miniaturowy-domek-book-nook-swiat-basniowych-snow-habarri,p1607964258,szkolne-i-papiernicze-p",
+    info: "Zestaw kreatywny DIY. Motyw: basniowe sny / fairy tale. Wiek: 8+.",
+    folder: "fairy-dreams",
+    images: Array.from({length:10}, (_,i) => `images/fairy-dreams/img_${i}.jpg`)
+  },
+  {
+    name: "Wladca Pierscieni - Book Nook",
+    price: "206,00 zl",
+    source: "Media Expert",
+    url: "https://www.mediaexpert.pl/zabawki/zabawki-kolekcjonerskie/modele-do-sklejania/miniaturowy-domek-book-nook-wladca-pierscieni",
+    info: "227 elementow. Miniaturowy domek Book Nook z motywem Wladcy Pierscieni.",
+    folder: "lotr",
+    images: Array.from({length:11}, (_,i) => `images/lotr/img_${i}.jpg`)
+  },
+  {
+    name: "Szkola Magii - Book Nook Puzzle 3D",
+    price: "~149,00 zl",
+    source: "Allegro",
+    url: "https://allegro.pl/oferta/diy-miniaturowy-domek-szkola-magii-book-nook-puzzle-3d-dekoracja-18280615687",
+    info: "Miniaturowy domek DIY. Motyw szkoly magii. Puzzle 3D, dekoracja z oswietleniem LED.",
+    folder: "magic-school",
+    images: [
+      "images/magic-school/img_0.png",
+      "images/magic-school/img_1.jpg",
+      "images/magic-school/img_2.jpg",
+      "images/magic-school/img_3.png",
+      "images/magic-school/img_4.png",
+      "images/magic-school/img_5.png",
+      "images/magic-school/img_6.png",
+      "images/magic-school/img_7.png",
+      "images/magic-school/img_8.png",
+      "images/magic-school/img_9.png"
+    ]
+  }
+];
+
+// Current gallery state
+const galleryState = {};
+
+function renderProducts() {
+  const container = document.getElementById('products');
+  container.innerHTML = products.map((p, pi) => {
+    galleryState[pi] = 0;
+    const priceHtml = p.oldPrice
+      ? `<span class="price"><s style="opacity:0.6;font-weight:400">${p.oldPrice}</s> ${p.price}</span>`
+      : `<span class="price">${p.price}</span>`;
+    return `
+    <div class="product-card">
+      <div class="product-header">
+        <h2>${p.name}</h2>
+        <div class="product-meta">
+          ${priceHtml}
+          <span class="source"><a href="${p.url}" target="_blank" rel="noopener">${p.source} &nearr;</a></span>
+        </div>
+      </div>
+      <div class="product-info">${p.info}</div>
+      <div class="gallery-container">
+        <div class="gallery-main" onclick="openLightbox(${pi})">
+          <button class="gallery-nav prev" onclick="event.stopPropagation();navGallery(${pi},-1)">&#8249;</button>
+          <img id="main-img-${pi}" src="${p.images[0]}" alt="${p.name}" loading="lazy">
+          <button class="gallery-nav next" onclick="event.stopPropagation();navGallery(${pi},1)">&#8250;</button>
+          <div class="gallery-counter" id="counter-${pi}">1 / ${p.images.length}</div>
+        </div>
+        <div class="gallery-thumbs" id="thumbs-${pi}">
+          ${p.images.map((img, ii) => `
+            <div class="thumb ${ii === 0 ? 'active' : ''}" onclick="goToImage(${pi},${ii})" id="thumb-${pi}-${ii}">
+              <img src="${img}" alt="Miniatura ${ii+1}" loading="lazy">
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function goToImage(pi, ii) {
+  const p = products[pi];
+  galleryState[pi] = ii;
+  document.getElementById(`main-img-${pi}`).src = p.images[ii];
+  document.getElementById(`counter-${pi}`).textContent = `${ii+1} / ${p.images.length}`;
+  // Update thumbs
+  const thumbs = document.getElementById(`thumbs-${pi}`).children;
+  for (let t of thumbs) t.classList.remove('active');
+  document.getElementById(`thumb-${pi}-${ii}`).classList.add('active');
+}
+
+function navGallery(pi, dir) {
+  const p = products[pi];
+  let idx = galleryState[pi] + dir;
+  if (idx < 0) idx = p.images.length - 1;
+  if (idx >= p.images.length) idx = 0;
+  goToImage(pi, idx);
+}
+
+// Lightbox
+let lbProduct = 0;
+let lbIndex = 0;
+
+function openLightbox(pi) {
+  lbProduct = pi;
+  lbIndex = galleryState[pi];
+  updateLightbox();
+  document.getElementById('lightbox').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function lightboxNav(dir) {
+  const p = products[lbProduct];
+  lbIndex += dir;
+  if (lbIndex < 0) lbIndex = p.images.length - 1;
+  if (lbIndex >= p.images.length) lbIndex = 0;
+  updateLightbox();
+}
+
+function updateLightbox() {
+  const p = products[lbProduct];
+  document.getElementById('lightbox-img').src = p.images[lbIndex];
+  document.getElementById('lightbox-counter').textContent = `${p.name} - ${lbIndex+1} / ${p.images.length}`;
+}
+
+// Keyboard navigation
+document.addEventListener('keydown', e => {
+  const lb = document.getElementById('lightbox');
+  if (lb.classList.contains('open')) {
+    if (e.key === 'Escape') closeLightbox();
+    if (e.key === 'ArrowLeft') lightboxNav(-1);
+    if (e.key === 'ArrowRight') lightboxNav(1);
+  }
+});
+
+// Close lightbox on backdrop click
+document.getElementById('lightbox').addEventListener('click', e => {
+  if (e.target === document.getElementById('lightbox')) closeLightbox();
+});
+
+renderProducts();
+</script>
+
+</body>
+</html>
