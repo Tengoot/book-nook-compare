@@ -245,6 +245,25 @@
     font-size: 1.4rem;
   }
 
+  .retract-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.4rem 0.8rem;
+    border: 1px solid #666;
+    background: transparent;
+    color: #999;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .retract-btn:hover {
+    border-color: #e94560;
+    color: #e94560;
+  }
+
   /* Gallery */
   .gallery-container {
     position: relative;
@@ -400,6 +419,92 @@
     font-size: 0.9rem;
   }
 
+  /* Code entry */
+  .code-gate {
+    max-width: 500px;
+    margin: 1.5rem auto 0;
+    padding: 1.5rem;
+    background: #1a1a2e;
+    border: 1px solid #333;
+    border-radius: 12px;
+    text-align: center;
+  }
+
+  .code-gate h3 {
+    color: #fff;
+    margin-bottom: 0.5rem;
+    font-size: 1.1rem;
+  }
+
+  .code-gate p {
+    color: #aaa;
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+  }
+
+  .code-input-row {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+  }
+
+  .code-input-row input {
+    padding: 0.6rem 1rem;
+    border: 2px solid #444;
+    border-radius: 8px;
+    background: #111;
+    color: #fff;
+    font-size: 1.1rem;
+    font-family: monospace;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    width: 200px;
+    text-align: center;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .code-input-row input:focus {
+    border-color: #e94560;
+  }
+
+  .code-input-row button {
+    padding: 0.6rem 1.2rem;
+    border: none;
+    border-radius: 8px;
+    background: #e94560;
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .code-input-row button:hover {
+    background: #c62c4a;
+  }
+
+  .code-status {
+    margin-top: 0.75rem;
+    font-size: 0.9rem;
+    min-height: 1.4em;
+  }
+
+  .code-status.ok { color: #4caf50; }
+  .code-status.err { color: #e94560; }
+  .code-status.info { color: #5dade2; }
+
+  .votes-remaining {
+    display: inline-block;
+    background: #0f3460;
+    color: #5dade2;
+    padding: 0.2rem 0.7rem;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-left: 0.5rem;
+  }
+
   .firebase-error {
     max-width: 1400px;
     margin: 1rem auto;
@@ -419,6 +524,8 @@
     .thumb { width: 48px; height: 48px; }
     .ranking-label { width: 120px; font-size: 0.75rem; }
     .vote-section { flex-wrap: wrap; }
+    .code-input-row { flex-direction: column; align-items: center; }
+    .code-input-row input { width: 100%; max-width: 200px; }
   }
 </style>
 </head>
@@ -428,6 +535,16 @@
   <h1>Book Nook DIY - Porownanie produktow</h1>
   <p>7 modeli miniaturowych domkow &bull; Przejrzyj galerie i zaglosuj na ulubiony!</p>
 </header>
+
+<div class="code-gate" id="code-gate">
+  <h3>Wpisz swoje imie aby glosowac</h3>
+  <p>Masz 2 glosy do oddania. Mozesz tez wycofac glos i zaglosowac na cos innego.</p>
+  <div class="code-input-row">
+    <input type="text" id="code-input" placeholder="Twoje imie" maxlength="20" autocomplete="off">
+    <button onclick="validateCode()">Aktywuj</button>
+  </div>
+  <div class="code-status" id="code-status"></div>
+</div>
 
 <div class="firebase-error" id="firebase-error">
   Glosowanie niedostepne - brak polaczenia z baza danych.
@@ -562,17 +679,120 @@ const products = [
   }
 ];
 
+// ============================================================
 // Vote state
+// ============================================================
+const MAX_VOTES = 2;
 const votes = {};
 products.forEach(p => votes[p.id] = 0);
 
-function getMyVote() {
-  return localStorage.getItem('booknook_vote') || null;
+// Active code session
+let activeCode = null;   // the validated code string
+let codeData = null;     // {used: N, votes: [...]}
+
+function getStoredCode() {
+  return localStorage.getItem('booknook_code') || null;
+}
+function setStoredCode(code) {
+  localStorage.setItem('booknook_code', code);
+}
+function getMyVotes() {
+  // returns array of product IDs this code voted for
+  return codeData ? (codeData.votes || []) : [];
+}
+function remainingVotes() {
+  return MAX_VOTES - getMyVotes().length;
 }
 
-function setMyVote(productId) {
-  localStorage.setItem('booknook_vote', productId);
+// ============================================================
+// Code validation
+// ============================================================
+function validateCode() {
+  const input = document.getElementById('code-input');
+  const status = document.getElementById('code-status');
+  const code = input.value.trim().toUpperCase();
+
+  if (!code) {
+    status.className = 'code-status err';
+    status.textContent = 'Wpisz kod!';
+    return;
+  }
+
+  if (!firebaseReady) {
+    status.className = 'code-status err';
+    status.textContent = 'Brak polaczenia z baza.';
+    return;
+  }
+
+  status.className = 'code-status info';
+  status.textContent = 'Sprawdzam...';
+
+  db.ref('codes/' + code).once('value').then(snap => {
+    const data = snap.val();
+    if (data === null) {
+      status.className = 'code-status err';
+      status.textContent = 'Nieprawidlowy kod!';
+      return;
+    }
+
+    const usedVotes = (data.votes || []).length;
+    if (usedVotes >= MAX_VOTES) {
+      status.className = 'code-status err';
+      status.textContent = 'Ten kod zostal juz w pelni wykorzystany!';
+      return;
+    }
+
+    // Code is valid
+    activeCode = code;
+    codeData = { used: data.used || 0, votes: data.votes || [] };
+    setStoredCode(code);
+
+    const rem = MAX_VOTES - usedVotes;
+    status.className = 'code-status ok';
+    status.innerHTML = `Kod aktywny! <span class="votes-remaining">Pozostalo glosow: ${rem}</span>`;
+    input.disabled = true;
+
+    renderProducts(); // re-render with active vote buttons
+  }).catch(err => {
+    status.className = 'code-status err';
+    status.textContent = 'Blad sieci. Sprobuj ponownie.';
+    console.error(err);
+  });
 }
+
+// Try restoring code from localStorage on load
+function tryRestoreCode() {
+  const stored = getStoredCode();
+  if (!stored || !firebaseReady) return;
+
+  db.ref('codes/' + stored).once('value').then(snap => {
+    const data = snap.val();
+    if (data === null) return;
+
+    activeCode = stored;
+    codeData = { used: data.used || 0, votes: data.votes || [] };
+
+    const input = document.getElementById('code-input');
+    const status = document.getElementById('code-status');
+    input.value = stored;
+    input.disabled = true;
+
+    const rem = remainingVotes();
+    if (rem > 0) {
+      status.className = 'code-status ok';
+      status.innerHTML = `Kod aktywny! <span class="votes-remaining">Pozostalo glosow: ${rem}</span>`;
+    } else {
+      status.className = 'code-status ok';
+      status.innerHTML = `Wszystkie glosy oddane! Dziekujemy.`;
+    }
+    renderProducts();
+  });
+}
+
+// Enter key to validate
+document.getElementById('code-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') validateCode();
+});
 
 // ============================================================
 // Gallery state & rendering
@@ -581,7 +801,8 @@ const galleryState = {};
 
 function renderProducts() {
   const container = document.getElementById('products');
-  const myVote = getMyVote();
+  const myVotes = getMyVotes();
+  const canVote = activeCode && remainingVotes() > 0;
 
   container.innerHTML = products.map((p, pi) => {
     galleryState[pi] = 0;
@@ -589,18 +810,36 @@ function renderProducts() {
       ? `<span class="price"><s style="opacity:0.6;font-weight:400">${p.oldPrice}</s> ${p.price}</span>`
       : `<span class="price">${p.price}</span>`;
 
-    const isVotedFor = myVote === p.id;
-    const hasVoted = myVote !== null;
+    const votedCount = myVotes.filter(v => v === p.id).length;
+    const isVotedFor = votedCount > 0;
+
     let btnClass = 'vote-btn';
     let btnText = '&#9734; Glosuj';
     let btnOnclick = `castVote('${p.id}')`;
-    if (isVotedFor) {
-      btnClass += ' voted';
-      btnText = '&#10003; Twoj glos!';
-      btnOnclick = '';
-    } else if (hasVoted) {
+
+    if (!activeCode) {
       btnClass += ' disabled';
+      btnText = '&#128274; Wpisz imie';
       btnOnclick = '';
+    } else if (canVote) {
+      if (isVotedFor) {
+        btnText = `&#10003; Glos oddany (${votedCount})`;
+      }
+    } else {
+      // no remaining votes
+      if (isVotedFor) {
+        btnClass += ' voted';
+        btnText = `&#10003; Twoj glos (${votedCount})`;
+      } else {
+        btnClass += ' disabled';
+      }
+      btnOnclick = '';
+    }
+
+    // Retract button
+    let retractHtml = '';
+    if (activeCode && isVotedFor) {
+      retractHtml = `<button class="retract-btn" onclick="retractVote('${p.id}')">&times; Wycofaj glos</button>`;
     }
 
     const voteCount = votes[p.id] || 0;
@@ -617,6 +856,7 @@ function renderProducts() {
       <div class="product-info">${p.info}</div>
       <div class="vote-section">
         <button class="${btnClass}" id="vote-btn-${p.id}" ${btnOnclick ? `onclick="${btnOnclick}"` : ''}>${btnText}</button>
+        ${retractHtml}
         <div class="vote-count" id="vote-count-${p.id}"><span>${voteCount}</span> ${voteCount === 1 ? 'glos' : 'glosow'}</div>
       </div>
       <div class="gallery-container">
@@ -639,8 +879,8 @@ function renderProducts() {
 }
 
 function updateVoteUI() {
-  const myVote = getMyVote();
   const totalVotes = Object.values(votes).reduce((s, v) => s + v, 0);
+  const myVotes = getMyVotes();
 
   products.forEach(p => {
     const count = votes[p.id] || 0;
@@ -648,26 +888,12 @@ function updateVoteUI() {
     if (countEl) {
       countEl.innerHTML = `<span>${count}</span> ${count === 1 ? 'glos' : 'glosow'}`;
     }
-
-    const btn = document.getElementById(`vote-btn-${p.id}`);
-    if (btn) {
-      if (myVote === p.id) {
-        btn.className = 'vote-btn voted';
-        btn.innerHTML = '&#10003; Twoj glos!';
-        btn.onclick = null;
-      } else if (myVote) {
-        btn.className = 'vote-btn disabled';
-        btn.onclick = null;
-      }
-    }
-
     const card = document.getElementById(`card-${p.id}`);
     if (card) {
-      card.classList.toggle('voted-for', myVote === p.id);
+      card.classList.toggle('voted-for', myVotes.includes(p.id));
     }
   });
 
-  // Update ranking
   updateRanking(totalVotes);
 }
 
@@ -697,23 +923,84 @@ function updateRanking(totalVotes) {
 }
 
 // ============================================================
-// Voting logic
+// Voting logic (code-based, 2 votes per code)
 // ============================================================
 function castVote(productId) {
-  if (getMyVote()) return; // already voted
-  if (!firebaseReady) {
-    alert('Glosowanie niedostepne - Firebase nie jest skonfigurowany.');
-    return;
-  }
+  if (!activeCode || remainingVotes() <= 0) return;
+  if (!firebaseReady) return;
 
-  const ref = db.ref('votes/' + productId);
-  ref.transaction(current => (current || 0) + 1, (error) => {
-    if (error) {
+  // Atomically update code usage AND vote count
+  const codeRef = db.ref('codes/' + activeCode);
+  codeRef.transaction(current => {
+    if (!current) return current;
+    const v = current.votes || [];
+    if (v.length >= MAX_VOTES) return; // abort
+    v.push(productId);
+    current.votes = v;
+    current.used = v.length;
+    return current;
+  }, (error, committed) => {
+    if (error || !committed) {
       alert('Blad podczas glosowania. Sprobuj ponownie.');
-    } else {
-      setMyVote(productId);
-      updateVoteUI();
+      return;
     }
+    // Now increment vote counter
+    db.ref('votes/' + productId).transaction(c => (c || 0) + 1);
+
+    // Update local state
+    codeData.votes.push(productId);
+    codeData.used = codeData.votes.length;
+
+    const rem = remainingVotes();
+    const status = document.getElementById('code-status');
+    if (rem > 0) {
+      status.innerHTML = `Kod aktywny! <span class="votes-remaining">Pozostalo glosow: ${rem}</span>`;
+    } else {
+      status.innerHTML = `Wszystkie glosy oddane! Dziekujemy.`;
+    }
+
+    renderProducts();
+  });
+}
+
+// ============================================================
+// Retract vote
+// ============================================================
+function retractVote(productId) {
+  if (!activeCode || !firebaseReady) return;
+  const myVotes = getMyVotes();
+  const idx = myVotes.indexOf(productId);
+  if (idx === -1) return;
+
+  // Remove one instance of this vote from code
+  const codeRef = db.ref('codes/' + activeCode);
+  codeRef.transaction(current => {
+    if (!current) return current;
+    const v = current.votes || [];
+    const removeIdx = v.indexOf(productId);
+    if (removeIdx === -1) return; // abort
+    v.splice(removeIdx, 1);
+    current.votes = v;
+    current.used = v.length;
+    return current;
+  }, (error, committed) => {
+    if (error || !committed) {
+      alert('Blad podczas wycofywania glosu.');
+      return;
+    }
+    // Decrement vote counter
+    db.ref('votes/' + productId).transaction(c => Math.max((c || 0) - 1, 0));
+
+    // Update local state
+    const localIdx = codeData.votes.indexOf(productId);
+    if (localIdx !== -1) codeData.votes.splice(localIdx, 1);
+    codeData.used = codeData.votes.length;
+
+    const rem = remainingVotes();
+    const status = document.getElementById('code-status');
+    status.innerHTML = `Glos wycofany! <span class="votes-remaining">Pozostalo glosow: ${rem}</span>`;
+
+    renderProducts();
   });
 }
 
@@ -733,6 +1020,8 @@ function initFirebaseListeners() {
     });
     updateVoteUI();
   });
+
+  tryRestoreCode();
 }
 
 // ============================================================
