@@ -852,10 +852,12 @@ function renderProducts() {
       btnClass += ' disabled';
       btnText = '&#128274; Wpisz imie';
       btnOnclick = '';
+    } else if (isVotedFor) {
+      btnClass += ' voted';
+      btnText = `&#10003; Glos oddany`;
+      btnOnclick = '';
     } else if (canVote) {
-      if (isVotedFor) {
-        btnText = `&#10003; Glos oddany (${votedCount})`;
-      }
+      // ok, can vote
     } else {
       // no remaining votes
       if (isVotedFor) {
@@ -961,6 +963,7 @@ function updateRanking(totalVotes) {
 // ============================================================
 function castVote(productId) {
   if (!activeCode || remainingVotes() <= 0) return;
+  if (getMyVotes().includes(productId)) return; // already voted for this one
   if (!firebaseReady) return;
 
   // Atomically update code usage AND vote count
@@ -969,6 +972,7 @@ function castVote(productId) {
     if (!current) return current;
     const v = current.votes || [];
     if (v.length >= MAX_VOTES) return; // abort
+    if (v.includes(productId)) return; // abort - already voted for this
     v.push(productId);
     current.votes = v;
     current.used = v.length;
