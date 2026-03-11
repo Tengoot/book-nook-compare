@@ -95,6 +95,14 @@
     font-weight: 700;
     color: #fff;
     text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    white-space: nowrap;
+    max-width: calc(100% - 20px);
+    overflow: hidden;
+  }
+
+  .ranking-voters-span {
+    opacity: 1;
+    transition: opacity 0.3s;
   }
 
   .products {
@@ -898,7 +906,7 @@ function renderProducts() {
         <div class="vote-count" id="vote-count-${p.id}"><span>${voteCount}</span> ${voteCount === 1 ? 'glos' : 'glosow'}</div>
       </div>
       <div class="voters-list" id="voters-${p.id}">
-        ${(votersByProduct[p.id] || []).map(name => `<span class="voter-badge">${name}</span>`).join('')}
+        ${(votersByProduct[p.id] || []).map(v => `<span class="voter-badge">${typeof v === 'object' ? v.full : v}</span>`).join('')}
       </div>
       <div class="gallery-container">
         <div class="gallery-main" onclick="openLightbox(${pi})">
@@ -955,16 +963,30 @@ function updateRanking(totalVotes) {
 
   barsEl.innerHTML = sorted.map(item => {
     const pct = Math.round((item.votes / maxVotes) * 100);
-    const voters = (votersByProduct[item.id] || []).map(v => v.initials).join(', ');
+    const voters = (votersByProduct[item.id] || []).map(v => v.full).join(', ');
     return `
     <div class="ranking-row">
       <div class="ranking-label">${item.name}</div>
       <div class="ranking-bar-bg">
         <div class="ranking-bar-fill" style="width:${pct}%"></div>
-        <div class="ranking-votes">${item.votes}${voters ? ' · ' + voters : ''}</div>
+        <div class="ranking-votes"><span class="ranking-vote-count">${item.votes}</span>${voters ? '<span class="ranking-voters-span"> · ' + voters + '</span>' : ''}</div>
       </div>
     </div>`;
   }).join('');
+
+  // After rendering, check if voter names overflow and hide them if so
+  requestAnimationFrame(() => {
+    document.querySelectorAll('.ranking-votes').forEach(el => {
+      const voterSpan = el.querySelector('.ranking-voters-span');
+      if (!voterSpan) return;
+      // Show it first to measure
+      voterSpan.style.display = '';
+      // Check if the text overflows the bar
+      if (el.scrollWidth > el.parentElement.clientWidth - 20) {
+        voterSpan.style.display = 'none';
+      }
+    });
+  });
 }
 
 // ============================================================
