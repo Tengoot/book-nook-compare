@@ -1036,8 +1036,7 @@ function updateRanking(totalVotes) {
     section.style.display = 'none';
     return;
   }
-  // Visibility controlled by applyResultsVisibility()
-  if (!shouldShowResults()) return;
+  // Always render bars HTML; visibility controlled by applyResultsVisibility()
   const sorted = products.map(p => ({
     name: p.name,
     id: p.id,
