@@ -534,6 +534,48 @@
     margin-left: 0.5rem;
   }
 
+  /* Spoiler button */
+  .spoiler-section {
+    max-width: 500px;
+    margin: 1rem auto 0;
+    text-align: center;
+  }
+
+  .spoiler-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1.5rem;
+    border: 2px solid #f0a030;
+    background: transparent;
+    color: #f0a030;
+    border-radius: 30px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.25s;
+  }
+
+  .spoiler-btn:hover {
+    background: #f0a030;
+    color: #000;
+    transform: scale(1.05);
+  }
+
+  .spoiler-btn.active {
+    background: #f0a030;
+    color: #000;
+  }
+
+  /* Hidden results */
+  .results-hidden .vote-count {
+    visibility: hidden;
+  }
+
+  .results-hidden .voters-list {
+    display: none;
+  }
+
   .firebase-error {
     max-width: 1400px;
     margin: 1rem auto;
@@ -573,6 +615,10 @@
     <button onclick="validateCode()">Aktywuj</button>
   </div>
   <div class="code-status" id="code-status"></div>
+</div>
+
+<div class="spoiler-section" id="spoiler-section" style="display:none">
+  <button class="spoiler-btn" onclick="toggleSpoiler()">&#128065; Spoiler alert! Zobacz wyniki</button>
 </div>
 
 <div class="firebase-error" id="firebase-error">
@@ -722,6 +768,53 @@ function nameToDisplay(name) {
 // Active code session
 let activeCode = null;   // the validated code string
 let codeData = null;     // {used: N, votes: [...]}
+let spoilerRevealed = false; // spoiler toggle for non-voters
+
+function hasUserVoted() {
+  return activeCode && getMyVotes().length > 0;
+}
+
+function shouldShowResults() {
+  return hasUserVoted() || spoilerRevealed;
+}
+
+function toggleSpoiler() {
+  spoilerRevealed = !spoilerRevealed;
+  const btn = document.querySelector('.spoiler-btn');
+  if (spoilerRevealed) {
+    btn.classList.add('active');
+    btn.innerHTML = '&#128065; Ukryj wyniki';
+  } else {
+    btn.classList.remove('active');
+    btn.innerHTML = '&#128065; Spoiler alert! Zobacz wyniki';
+  }
+  applyResultsVisibility();
+}
+
+function applyResultsVisibility() {
+  const show = shouldShowResults();
+  const productsEl = document.getElementById('products');
+  const rankingEl = document.getElementById('ranking-section');
+
+  // Toggle results-hidden class on products container
+  if (show) {
+    productsEl.classList.remove('results-hidden');
+  } else {
+    productsEl.classList.add('results-hidden');
+  }
+
+  // Ranking: only show when there are votes AND results visible
+  const totalVotes = Object.values(votes).reduce((s, v) => s + v, 0);
+  if (totalVotes && show) {
+    rankingEl.style.display = '';
+  } else {
+    rankingEl.style.display = 'none';
+  }
+
+  // Spoiler button: show only when user hasn't voted yet
+  const spoilerEl = document.getElementById('spoiler-section');
+  spoilerEl.style.display = hasUserVoted() ? 'none' : '';
+}
 
 function getStoredCode() {
   return localStorage.getItem('booknook_code') || null;
@@ -933,6 +1026,7 @@ function updateVoteUI() {
   });
 
   updateRanking(totalVotes);
+  applyResultsVisibility();
 }
 
 function updateRanking(totalVotes) {
@@ -942,7 +1036,8 @@ function updateRanking(totalVotes) {
     section.style.display = 'none';
     return;
   }
-  section.style.display = '';
+  // Visibility controlled by applyResultsVisibility()
+  if (!shouldShowResults()) return;
   const sorted = products.map(p => ({
     name: p.name,
     id: p.id,
@@ -1103,8 +1198,9 @@ function initFirebaseListeners() {
         el.innerHTML = votersByProduct[p.id].map(v => `<span class="voter-badge">${v.full}</span>`).join('');
       }
     });
-    // Update ranking with initials
+    // Update ranking and apply visibility
     updateRanking(Object.values(votes).reduce((s,v) => s+v, 0));
+    applyResultsVisibility();
   });
 
   tryRestoreCode();
@@ -1178,6 +1274,7 @@ document.getElementById('lightbox').addEventListener('click', e => {
 // Init
 renderProducts();
 initFirebaseListeners();
+applyResultsVisibility();
 </script>
 
 </body>
