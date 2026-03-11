@@ -693,18 +693,7 @@ const products = [
     source: "Allegro",
     url: "https://allegro.pl/oferta/diy-miniaturowy-domek-szkola-magii-book-nook-puzzle-3d-dekoracja-18280615687",
     info: "Miniaturowy domek DIY. Motyw szkoly magii. Puzzle 3D, dekoracja z oswietleniem LED.",
-    images: [
-      "images/magic-school/img_0.png",
-      "images/magic-school/img_1.jpg",
-      "images/magic-school/img_2.jpg",
-      "images/magic-school/img_3.png",
-      "images/magic-school/img_4.png",
-      "images/magic-school/img_5.png",
-      "images/magic-school/img_6.png",
-      "images/magic-school/img_7.png",
-      "images/magic-school/img_8.png",
-      "images/magic-school/img_9.png"
-    ]
+    images: Array.from({length:5}, (_,i) => `images/magic-school/img_${i}.png`)
   }
 ];
 
