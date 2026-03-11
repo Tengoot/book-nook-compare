@@ -861,22 +861,22 @@ function validateCode() {
       return;
     }
 
-    const usedVotes = (data.votes || []).length;
-    if (usedVotes >= MAX_VOTES) {
-      status.className = 'code-status err';
-      status.textContent = 'Ten kod zostal juz w pelni wykorzystany!';
-      return;
-    }
-
     // Code is valid
     activeCode = code;
     codeData = { used: data.used || 0, votes: data.votes || [] };
     setStoredCode(code);
 
+    const usedVotes = (data.votes || []).length;
     const rem = MAX_VOTES - usedVotes;
-    status.className = 'code-status ok';
-    status.innerHTML = `Kod aktywny! <span class="votes-remaining">Pozostalo glosow: ${rem}</span>`;
     input.disabled = true;
+
+    if (rem > 0) {
+      status.className = 'code-status ok';
+      status.innerHTML = `Kod aktywny! <span class="votes-remaining">Pozostalo glosow: ${rem}</span>`;
+    } else {
+      status.className = 'code-status ok';
+      status.innerHTML = `Wszystkie glosy oddane! Dziekujemy.`;
+    }
 
     renderProducts(); // re-render with active vote buttons
   }).catch(err => {
