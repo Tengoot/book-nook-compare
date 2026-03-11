@@ -32,6 +32,71 @@
     font-size: 0.95rem;
   }
 
+  /* Ranking bar */
+  .ranking {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 1.5rem 1rem 0;
+  }
+
+  .ranking h2 {
+    color: #fff;
+    font-size: 1.2rem;
+    margin-bottom: 1rem;
+    text-align: center;
+  }
+
+  .ranking-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .ranking-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .ranking-label {
+    width: 220px;
+    flex-shrink: 0;
+    font-size: 0.85rem;
+    color: #ccc;
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .ranking-bar-bg {
+    flex: 1;
+    height: 28px;
+    background: #222;
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .ranking-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #e94560, #f06292);
+    border-radius: 6px;
+    transition: width 0.6s ease;
+    min-width: 0;
+  }
+
+  .ranking-votes {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #fff;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+  }
+
   .products {
     max-width: 1400px;
     margin: 0 auto;
@@ -51,6 +116,11 @@
 
   .product-card:hover {
     border-color: #e94560;
+  }
+
+  .product-card.voted-for {
+    border-color: #4caf50;
+    box-shadow: 0 0 0 1px #4caf50;
   }
 
   .product-header {
@@ -104,6 +174,75 @@
     color: #bbb;
     font-size: 0.9rem;
     border-bottom: 1px solid #2a2a2a;
+  }
+
+  /* Voting */
+  .vote-section {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    background: #1e1e1e;
+    border-bottom: 1px solid #2a2a2a;
+  }
+
+  .vote-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1.5rem;
+    border: 2px solid #e94560;
+    background: transparent;
+    color: #e94560;
+    border-radius: 30px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.25s;
+  }
+
+  .vote-btn:hover {
+    background: #e94560;
+    color: #fff;
+    transform: scale(1.05);
+  }
+
+  .vote-btn.voted {
+    background: #4caf50;
+    border-color: #4caf50;
+    color: #fff;
+    cursor: default;
+  }
+
+  .vote-btn.voted:hover {
+    transform: none;
+  }
+
+  .vote-btn.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    border-color: #555;
+    color: #555;
+  }
+
+  .vote-btn.disabled:hover {
+    background: transparent;
+    color: #555;
+    transform: none;
+  }
+
+  .vote-count {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #fff;
+    min-width: 80px;
+    text-align: center;
+  }
+
+  .vote-count span {
+    color: #e94560;
+    font-size: 1.4rem;
   }
 
   /* Gallery */
@@ -261,11 +400,25 @@
     font-size: 0.9rem;
   }
 
+  .firebase-error {
+    max-width: 1400px;
+    margin: 1rem auto;
+    padding: 1rem;
+    background: #2a1a1a;
+    border: 1px solid #e94560;
+    border-radius: 8px;
+    text-align: center;
+    color: #e94560;
+    display: none;
+  }
+
   @media (max-width: 768px) {
     header h1 { font-size: 1.4rem; }
     .product-header h2 { font-size: 1.05rem; }
     .gallery-main { max-width: 100%; }
     .thumb { width: 48px; height: 48px; }
+    .ranking-label { width: 120px; font-size: 0.75rem; }
+    .vote-section { flex-wrap: wrap; }
   }
 </style>
 </head>
@@ -273,8 +426,17 @@
 
 <header>
   <h1>Book Nook DIY - Porownanie produktow</h1>
-  <p>7 modeli miniaturowych domkow do samodzielnego zlozenia</p>
+  <p>7 modeli miniaturowych domkow &bull; Przejrzyj galerie i zaglosuj na ulubiony!</p>
 </header>
+
+<div class="firebase-error" id="firebase-error">
+  Glosowanie niedostepne - brak polaczenia z baza danych.
+</div>
+
+<div class="ranking" id="ranking-section" style="display:none">
+  <h2>Ranking glosowania</h2>
+  <div class="ranking-bars" id="ranking-bars"></div>
+</div>
 
 <div class="products" id="products"></div>
 
@@ -287,70 +449,104 @@
   <div class="lightbox-counter" id="lightbox-counter"></div>
 </div>
 
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+
 <script>
+// ============================================================
+// FIREBASE CONFIG - wklej tutaj swoj config z Firebase Console
+// ============================================================
+const firebaseConfig = {
+  apiKey: "AIzaSyBQ4oMiJwWXKuWMCoEQbLOXFAvgThrh0vE",
+  authDomain: "book-book-voting.firebaseapp.com",
+  databaseURL: "https://book-book-voting-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "book-book-voting",
+  storageBucket: "book-book-voting.firebasestorage.app",
+  messagingSenderId: "471256393591",
+  appId: "1:471256393591:web:2d9d93622bca477a496372"
+};
+
+let db = null;
+let votesRef = null;
+let firebaseReady = false;
+
+try {
+  if (firebaseConfig.apiKey !== "PLACEHOLDER") {
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.database();
+    votesRef = db.ref('votes');
+    firebaseReady = true;
+  }
+} catch(e) {
+  console.error('Firebase init error:', e);
+}
+
+// ============================================================
+
 const products = [
   {
+    id: "slytherin",
     name: "Dom Slytherin - Harry Potter DIY 3D",
     price: "199,00 zl",
     oldPrice: "299,99 zl",
     source: "Home&Fun",
     url: "https://homeandfun.com.pl/pl/products/diy-book-nook-dom-slytherin-harry-potter-diy-3d-268.html",
     info: "Zestaw do samodzielnego zlozenia. Oswietlenie LED z wlacznikiem dotykowym. Wymiary ok. 20x14x10cm. Poziom trudnosci: sredni (14+). Instrukcja w jezyku polskim.",
-    folder: "slytherin",
     images: Array.from({length:10}, (_,i) => `images/slytherin/img_${i}.png`)
   },
   {
+    id: "fantastic-beasts",
     name: "Fantastyczne Zwierzeta - Cutebee",
     price: "199,00 zl",
     source: "Home&Fun",
     url: "https://homeandfun.com.pl/pl/products/diy-book-nook-fantastyczne-zwierzeta-cutebee-262.html",
     info: "Mechanizm obrotowy, oslona przeciwkurzowa, ilustrowana instrukcja krok po kroku.",
-    folder: "fantastic-beasts",
     images: Array.from({length:10}, (_,i) => `images/fantastic-beasts/img_${i}.png`)
   },
   {
+    id: "detective",
     name: "Agencja Detektywistyczna - Cutebee",
     price: "199,00 zl",
     source: "Home&Fun",
     url: "https://homeandfun.com.pl/pl/products/agencja-detektywistyczna-cutebee-diy-book-nook-puzzle-3d-prezent-198.html",
     info: "Cofnij sie w czasie, zostan detektywem, zlam kod, przeprowadz rekonstrukcje wydarzen i rozwiaz zagadke!",
-    folder: "detective",
     images: Array.from({length:10}, (_,i) => `images/detective/img_${i}.png`)
   },
   {
+    id: "future-world",
     name: "Swiat Przyszlosci - Joincon (HABARRI)",
     price: "~139,00 zl",
     source: "Empik",
     url: "https://www.empik.com/miniaturowy-domek-book-nook-swiat-przyszlosci-joincon-habarri,p1629128928,szkolne-i-papiernicze-p",
     info: "Zestaw kreatywny DIY. Motyw: swiat przyszlosci / sci-fi. Wiek: 8+.",
-    folder: "future-world",
     images: Array.from({length:10}, (_,i) => `images/future-world/img_${i}.jpg`)
   },
   {
+    id: "fairy-dreams",
     name: "Swiat Basniowych Snow - HABARRI",
     price: "~139,00 zl",
     source: "Empik",
     url: "https://www.empik.com/miniaturowy-domek-book-nook-swiat-basniowych-snow-habarri,p1607964258,szkolne-i-papiernicze-p",
     info: "Zestaw kreatywny DIY. Motyw: basniowe sny / fairy tale. Wiek: 8+.",
-    folder: "fairy-dreams",
     images: Array.from({length:10}, (_,i) => `images/fairy-dreams/img_${i}.jpg`)
   },
   {
+    id: "lotr",
     name: "Wladca Pierscieni - Book Nook",
     price: "206,00 zl",
     source: "Media Expert",
     url: "https://www.mediaexpert.pl/zabawki/zabawki-kolekcjonerskie/modele-do-sklejania/miniaturowy-domek-book-nook-wladca-pierscieni",
     info: "227 elementow. Miniaturowy domek Book Nook z motywem Wladcy Pierscieni.",
-    folder: "lotr",
     images: Array.from({length:11}, (_,i) => `images/lotr/img_${i}.jpg`)
   },
   {
+    id: "magic-school",
     name: "Szkola Magii - Book Nook Puzzle 3D",
     price: "~149,00 zl",
     source: "Allegro",
     url: "https://allegro.pl/oferta/diy-miniaturowy-domek-szkola-magii-book-nook-puzzle-3d-dekoracja-18280615687",
     info: "Miniaturowy domek DIY. Motyw szkoly magii. Puzzle 3D, dekoracja z oswietleniem LED.",
-    folder: "magic-school",
     images: [
       "images/magic-school/img_0.png",
       "images/magic-school/img_1.jpg",
@@ -366,18 +562,51 @@ const products = [
   }
 ];
 
-// Current gallery state
+// Vote state
+const votes = {};
+products.forEach(p => votes[p.id] = 0);
+
+function getMyVote() {
+  return localStorage.getItem('booknook_vote') || null;
+}
+
+function setMyVote(productId) {
+  localStorage.setItem('booknook_vote', productId);
+}
+
+// ============================================================
+// Gallery state & rendering
+// ============================================================
 const galleryState = {};
 
 function renderProducts() {
   const container = document.getElementById('products');
+  const myVote = getMyVote();
+
   container.innerHTML = products.map((p, pi) => {
     galleryState[pi] = 0;
     const priceHtml = p.oldPrice
       ? `<span class="price"><s style="opacity:0.6;font-weight:400">${p.oldPrice}</s> ${p.price}</span>`
       : `<span class="price">${p.price}</span>`;
+
+    const isVotedFor = myVote === p.id;
+    const hasVoted = myVote !== null;
+    let btnClass = 'vote-btn';
+    let btnText = '&#9734; Glosuj';
+    let btnOnclick = `castVote('${p.id}')`;
+    if (isVotedFor) {
+      btnClass += ' voted';
+      btnText = '&#10003; Twoj glos!';
+      btnOnclick = '';
+    } else if (hasVoted) {
+      btnClass += ' disabled';
+      btnOnclick = '';
+    }
+
+    const voteCount = votes[p.id] || 0;
+
     return `
-    <div class="product-card">
+    <div class="product-card ${isVotedFor ? 'voted-for' : ''}" id="card-${p.id}">
       <div class="product-header">
         <h2>${p.name}</h2>
         <div class="product-meta">
@@ -386,6 +615,10 @@ function renderProducts() {
         </div>
       </div>
       <div class="product-info">${p.info}</div>
+      <div class="vote-section">
+        <button class="${btnClass}" id="vote-btn-${p.id}" ${btnOnclick ? `onclick="${btnOnclick}"` : ''}>${btnText}</button>
+        <div class="vote-count" id="vote-count-${p.id}"><span>${voteCount}</span> ${voteCount === 1 ? 'glos' : 'glosow'}</div>
+      </div>
       <div class="gallery-container">
         <div class="gallery-main" onclick="openLightbox(${pi})">
           <button class="gallery-nav prev" onclick="event.stopPropagation();navGallery(${pi},-1)">&#8249;</button>
@@ -405,12 +638,111 @@ function renderProducts() {
   }).join('');
 }
 
+function updateVoteUI() {
+  const myVote = getMyVote();
+  const totalVotes = Object.values(votes).reduce((s, v) => s + v, 0);
+
+  products.forEach(p => {
+    const count = votes[p.id] || 0;
+    const countEl = document.getElementById(`vote-count-${p.id}`);
+    if (countEl) {
+      countEl.innerHTML = `<span>${count}</span> ${count === 1 ? 'glos' : 'glosow'}`;
+    }
+
+    const btn = document.getElementById(`vote-btn-${p.id}`);
+    if (btn) {
+      if (myVote === p.id) {
+        btn.className = 'vote-btn voted';
+        btn.innerHTML = '&#10003; Twoj glos!';
+        btn.onclick = null;
+      } else if (myVote) {
+        btn.className = 'vote-btn disabled';
+        btn.onclick = null;
+      }
+    }
+
+    const card = document.getElementById(`card-${p.id}`);
+    if (card) {
+      card.classList.toggle('voted-for', myVote === p.id);
+    }
+  });
+
+  // Update ranking
+  updateRanking(totalVotes);
+}
+
+function updateRanking(totalVotes) {
+  const section = document.getElementById('ranking-section');
+  const barsEl = document.getElementById('ranking-bars');
+  if (!totalVotes) {
+    section.style.display = 'none';
+    return;
+  }
+  section.style.display = '';
+  const sorted = products.map(p => ({name: p.name, votes: votes[p.id] || 0}))
+    .sort((a, b) => b.votes - a.votes);
+  const maxVotes = sorted[0].votes || 1;
+
+  barsEl.innerHTML = sorted.map(item => {
+    const pct = Math.round((item.votes / maxVotes) * 100);
+    return `
+    <div class="ranking-row">
+      <div class="ranking-label">${item.name}</div>
+      <div class="ranking-bar-bg">
+        <div class="ranking-bar-fill" style="width:${pct}%"></div>
+        <div class="ranking-votes">${item.votes}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ============================================================
+// Voting logic
+// ============================================================
+function castVote(productId) {
+  if (getMyVote()) return; // already voted
+  if (!firebaseReady) {
+    alert('Glosowanie niedostepne - Firebase nie jest skonfigurowany.');
+    return;
+  }
+
+  const ref = db.ref('votes/' + productId);
+  ref.transaction(current => (current || 0) + 1, (error) => {
+    if (error) {
+      alert('Blad podczas glosowania. Sprobuj ponownie.');
+    } else {
+      setMyVote(productId);
+      updateVoteUI();
+    }
+  });
+}
+
+// ============================================================
+// Firebase real-time listener
+// ============================================================
+function initFirebaseListeners() {
+  if (!firebaseReady) {
+    document.getElementById('firebase-error').style.display = 'block';
+    return;
+  }
+
+  votesRef.on('value', snapshot => {
+    const data = snapshot.val() || {};
+    products.forEach(p => {
+      votes[p.id] = data[p.id] || 0;
+    });
+    updateVoteUI();
+  });
+}
+
+// ============================================================
+// Gallery functions
+// ============================================================
 function goToImage(pi, ii) {
   const p = products[pi];
   galleryState[pi] = ii;
   document.getElementById(`main-img-${pi}`).src = p.images[ii];
   document.getElementById(`counter-${pi}`).textContent = `${ii+1} / ${p.images.length}`;
-  // Update thumbs
   const thumbs = document.getElementById(`thumbs-${pi}`).children;
   for (let t of thumbs) t.classList.remove('active');
   document.getElementById(`thumb-${pi}-${ii}`).classList.add('active');
@@ -455,7 +787,6 @@ function updateLightbox() {
   document.getElementById('lightbox-counter').textContent = `${p.name} - ${lbIndex+1} / ${p.images.length}`;
 }
 
-// Keyboard navigation
 document.addEventListener('keydown', e => {
   const lb = document.getElementById('lightbox');
   if (lb.classList.contains('open')) {
@@ -465,12 +796,13 @@ document.addEventListener('keydown', e => {
   }
 });
 
-// Close lightbox on backdrop click
 document.getElementById('lightbox').addEventListener('click', e => {
   if (e.target === document.getElementById('lightbox')) closeLightbox();
 });
 
+// Init
 renderProducts();
+initFirebaseListeners();
 </script>
 
 </body>
